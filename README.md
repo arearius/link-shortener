@@ -264,14 +264,34 @@ Caddy пишут **структурированные JSON-логи в stderr** 
 docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d --build
 ```
 
-- **Grafana**: <http://localhost:3000> — вход отключён (dev), datasource **Loki** уже
-  провижен. Explore → выбрать Loki.
 - Логи контейнеров `app`/`postgres` отправляются через Docker-драйвер **fluentd** в
   Fluent Bit (`:24224`), тот форвардит в **Loki** (`:3100`), Grafana читает из Loki.
 - Loki — «Prometheus для логов»: без JVM, индексирует только метки, поэтому в разы
   легче OpenSearch. Ретенция — 7 дней (см. `docker/logging/loki-config.yml`).
 - Многострочные записи (stack trace) склеиваются в одну обратно на стороне Fluent Bit
   (multiline-парсер `mixed_multiline`), поэтому не разваливаются на отдельные строки.
+
+### Как зайти в Grafana и посмотреть логи
+
+1. Откройте **<http://localhost:3000>**.
+2. **Вход не требуется** — Grafana открывается сразу как анонимный Admin (dev-режим).
+   Если форма входа всё же появится — логин/пароль **`admin` / `admin`**.
+3. Готовый дашборд уже провижен: слева **Dashboards → «Link Shortener — Логи и события»**
+   (или прямая ссылка **<http://localhost:3000/d/link-shortener-logs>**). На нём три панели:
+   - **Логи приложения (app)** — весь поток контейнера `app`;
+   - **Доменные события** — только бизнес-события (`auth.*`, `link.*`);
+   - **События по типам** — график количества событий по видам.
+   Справа сверху выберите период (напр. **Last 1 hour**) и жмите обновление.
+4. Проверить руками: **Explore** (иконка компаса) → datasource **Loki** (выбран по умолчанию) →
+   вставьте запрос и **Run query**, например:
+   ```logql
+   {job="docker"} | json | event="link.created"
+   ```
+   Затем в приложении создайте ссылку/войдите/перейдите по короткой ссылке —
+   и события появятся в Grafana.
+
+> Данные появляются после действий в приложении. Datasource Loki и дашборд
+> провижатся автоматически из `docker/logging/grafana/` — настраивать вручную ничего не нужно.
 
 ### Доменные события (единая схема)
 
@@ -294,14 +314,16 @@ docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d --build
 
 Благодаря единой схеме события фильтруются одинаково по полю `event`.
 
-Примеры запросов **LogQL** (Grafana → Explore):
+Примеры запросов **LogQL** (Grafana → Explore). Селектор потока — `{job="docker"}`
+(метка `container_name` приходит как structured metadata, поэтому фильтруется через `|`,
+а не в `{…}`):
 
 ```logql
-{container_name="/link_shortener_app"}                          # все логи приложения
+{job="docker"} | container_name="/link_shortener_app"           # все логи приложения
 {job="docker"} |= "error"                                       # ошибки по всем контейнерам
-{container_name="/link_shortener_app"} | json | event="link.created"    # только создания ссылок
-{container_name="/link_shortener_app"} | json | event="auth.failed"     # неудачные входы
-sum by (event) (count_over_time({container_name="/link_shortener_app"} | json [5m]))  # разбивка по событиям
+{job="docker"} | json | event="link.created"                    # только создания ссылок
+{job="docker"} | json | event="auth.failed"                     # неудачные входы
+sum by (event) (count_over_time({job="docker"} | json | event=~".+" [5m]))  # разбивка по событиям
 ```
 
 Стек логирования локальный (dev). Компоненты (образы Fluent Bit/Loki/Grafana,

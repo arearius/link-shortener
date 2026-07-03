@@ -50,15 +50,19 @@ services:
     container_name: link_shortener_grafana
     restart: unless-stopped
     environment:
-      # Dev-only: open Grafana without login.
+      # Dev-only: open Grafana without login (anonymous Admin). If you enable the
+      # login form, the admin credentials below still work.
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
       GF_SECURITY_ALLOW_EMBEDDING: "true"
     ports:
       - "3000:3000"
     volumes:
       - ./docker/logging/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/logging/grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     depends_on:
       - loki
