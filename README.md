@@ -41,10 +41,22 @@ cd link-shortener
 docker compose up -d --build
 ```
 
+Поднимаются **только** приложение (FrankenPHP) и PostgreSQL — без Grafana/Loki.
 Всё остальное делает entrypoint контейнера при первом старте (идемпотентно):
 создаёт `.env` из `.env.example`, ставит зависимости (`composer install`),
 генерирует `APP_KEY` и применяет миграции — затем запускает FrankenPHP.
 Ручные шаги не нужны.
+
+### Два режима запуска
+
+| Режим | Команда | Что поднимается |
+|---|---|---|
+| **По умолчанию** (рекомендуется для проверки) | `docker compose up -d --build` | приложение + PostgreSQL. Логи — JSON в stderr, видны через `docker compose logs -f app` |
+| **С централизованным логированием** | `docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d --build` | то же + Fluent Bit → Loki → **Grafana** (<http://localhost:3000>) |
+
+Логирование вынесено в отдельный оверрей `docker-compose.logging.yml`, поэтому
+базовый запуск лёгкий и не тянет Grafana/Loki. Подробности — в разделе
+[Логирование](#логирование).
 
 > Первый запуск дольше: внутри контейнера выполняется `composer install`.
 > Прогресс виден в `docker compose logs -f app` (строки `[entrypoint] ...`).
@@ -240,11 +252,12 @@ docker compose exec app php artisan filament:optimize
 
 ## Логирование
 
-Приложение и Caddy пишут **структурированные JSON-логи в stderr** (12-factor):
+По умолчанию (`docker compose up -d`) Grafana/Loki **не запускаются** — приложение и
+Caddy пишут **структурированные JSON-логи в stderr** (12-factor):
 `LOG_CHANNEL=stderr` + `Monolog\Formatter\JsonFormatter` для Laravel, `log { format json }`
-для FrankenPHP/Caddy. Без дополнительного стека их видно через `docker compose logs -f`.
+для FrankenPHP/Caddy. Этого достаточно, чтобы читать логи через `docker compose logs -f app`.
 
-Для централизованного сбора есть лёгкий стек **Fluent Bit → Loki → Grafana**
+Опционально доступен лёгкий стек централизованного сбора **Fluent Bit → Loki → Grafana**
 (в отдельном оверрее `docker-compose.logging.yml`, чтобы базовый запуск оставался лёгким):
 
 ```bash
