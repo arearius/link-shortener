@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\LinkResource\Pages;
 use App\Filament\Resources\LinkResource\RelationManagers\ClicksRelationManager;
 use App\Models\Link;
+use App\Rules\ExternalUrl;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -32,6 +33,8 @@ class LinkResource extends Resource
                     ->url()
                     ->required()
                     ->maxLength(2048)
+                    ->rule(new ExternalUrl())
+                    ->helperText('Только внешние http/https-адреса.')
                     ->columnSpanFull(),
 
                 // Shown when editing an existing link; the code is generated on create.
@@ -78,6 +81,11 @@ class LinkResource extends Resource
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
+            ->searchPlaceholder('Поиск по коду или URL')
+            ->persistSearchInSession()
+            ->persistSortInSession()
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(10)
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
@@ -87,7 +95,9 @@ class LinkResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->emptyStateHeading('Пока нет ссылок')
+            ->emptyStateDescription('Создайте первую короткую ссылку.');
     }
 
     public static function getRelations(): array

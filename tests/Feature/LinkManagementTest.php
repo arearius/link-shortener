@@ -57,6 +57,19 @@ class LinkManagementTest extends TestCase
         $this->assertNotEmpty($link->code);
     }
 
+    public function test_creating_a_link_rejects_non_external_urls(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(CreateLink::class)
+            ->fillForm(['original_url' => 'http://localhost:8080/app/login'])
+            ->call('create')
+            ->assertHasFormErrors(['original_url']);
+
+        $this->assertDatabaseCount('links', 0);
+    }
+
     public function test_user_can_delete_their_own_link(): void
     {
         $user = User::factory()->create();

@@ -49,10 +49,16 @@ docker compose exec app php artisan key:generate
 
 # 4. Миграции
 docker compose exec app php artisan migrate
+
+# 5. (необязательно) демо-данные: пользователь + примеры ссылок с кликами
+docker compose exec app php artisan db:seed
 ```
 
 Приложение: <http://localhost:8080>
 Личный кабинет (Filament): <http://localhost:8080/app>
+
+**Демо-доступ** (после `db:seed`): `demo@example.com` / `password` — с тремя
+готовыми ссылками и статистикой. Сидер идемпотентен, повторный запуск не дублирует данные.
 
 > Локально сервер работает по **чистому HTTP** (`SERVER_NAME=:8080` в
 > `docker-compose.yml`), поэтому самоподписанных сертификатов и предупреждений
@@ -61,9 +67,11 @@ docker compose exec app php artisan migrate
 
 ## Использование
 
-1. Откройте <http://localhost:8080/app/register> и зарегистрируйтесь.
+1. Откройте <http://localhost:8080/app/register> и зарегистрируйтесь
+   (или войдите под демо-аккаунтом, если запускали `db:seed`).
 2. В разделе **«Мои ссылки»** нажмите «Создать ссылку», укажите оригинальный URL —
-   короткий код сгенерируется автоматически.
+   короткий код сгенерируется автоматически. Принимаются только внешние
+   http/https-адреса (адрес самого приложения и loopback отклоняются).
 3. Перейдите по короткой ссылке (`http://localhost:8080/{код}`) — произойдёт
    редирект, а переход попадёт в статистику.
 4. Откройте ссылку («Просмотр»/«Изменить») — под формой виден список переходов
@@ -81,10 +89,12 @@ docker compose exec app php artisan test
 Покрытие:
 
 - **Unit** — `ShortCodeGenerator` (длина, алфавит base62, уникальность),
-  модель `Link` (accessor `short_url`, запись клика + инкремент счётчика).
+  модель `Link` (accessor `short_url`, запись клика + инкремент счётчика),
+  правило `ExternalUrl` (принимает внешние http/https, отклоняет иные схемы,
+  loopback и хост приложения).
 - **Feature** — редирект (302 + запись клика, 404 на неизвестный код),
-  управление ссылками в Filament (видны только свои, создание, удаление,
-  запрет доступа к чужим), страницы регистрации/входа.
+  управление ссылками в Filament (видны только свои, создание, отклонение
+  внутренних URL, удаление, запрет доступа к чужим), страницы регистрации/входа.
 
 ## Структура
 
@@ -95,8 +105,10 @@ app/
 ├── Http/Controllers/RedirectController.php      # публичный редирект + учёт кликов
 ├── Models/{Link,Click,User}.php
 ├── Providers/Filament/AppPanelProvider.php      # панель /app с регистрацией
+├── Rules/ExternalUrl.php                         # валидация внешнего http/https URL
 └── Services/ShortCodeGenerator.php              # генерация base62-кода
 database/migrations/                             # links, clicks
+database/seeders/DatabaseSeeder.php              # демо-пользователь + ссылки
 docker/                                          # Dockerfile (FrankenPHP), Caddyfile, init.sql
 docker-compose.yml
 tests/{Unit,Feature}/
