@@ -16,7 +16,11 @@ return new class extends Migration
             $table->unsignedInteger('clicks_count')->default(0);
             $table->timestamps();
 
-            $table->index('user_id');
+            // Dashboard lists a user's links newest-first:
+            // WHERE user_id = ? ORDER BY created_at DESC.
+            // Composite index covers both the filter and the sort; its leftmost
+            // column also serves plain user_id lookups (and the FK).
+            $table->index(['user_id', 'created_at']);
         });
     }
 

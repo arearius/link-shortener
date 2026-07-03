@@ -15,8 +15,10 @@ return new class extends Migration
             $table->text('user_agent')->nullable();
             $table->timestamp('created_at')->nullable();
 
-            $table->index('link_id');
-            $table->index('created_at');
+            // Statistics screen lists a link's clicks newest-first:
+            // WHERE link_id = ? ORDER BY created_at DESC.
+            // Composite index covers filter + sort; leftmost column serves the FK.
+            $table->index(['link_id', 'created_at']);
         });
     }
 
