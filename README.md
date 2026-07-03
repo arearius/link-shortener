@@ -108,10 +108,12 @@ app/
 ├── Filament/Resources/LinkResource.php         # личный кабинет: CRUD ссылок
 │   └── LinkResource/RelationManagers/          # статистика переходов
 ├── Http/Controllers/RedirectController.php      # публичный редирект + учёт кликов
+├── Listeners/LogAuthenticationEvents.php         # события auth.* в лог
+├── Logging/JsonEventFormatter.php                # единая JSON-схема событий
 ├── Models/{Link,Click,User}.php
 ├── Providers/Filament/AppPanelProvider.php      # панель /app с регистрацией
 ├── Rules/ExternalUrl.php                         # валидация внешнего http/https URL
-└── Services/ShortCodeGenerator.php              # генерация base62-кода
+└── Services/{ShortCodeGenerator,EventLogger}.php # генерация кода, лог доменных событий
 database/migrations/                             # links, clicks
 database/seeders/DatabaseSeeder.php              # демо-пользователь + ссылки
 docker/                                          # Dockerfile (FrankenPHP), Caddyfile,
@@ -255,13 +257,38 @@ docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d --build
   Fluent Bit (`:24224`), тот форвардит в **Loki** (`:3100`), Grafana читает из Loki.
 - Loki — «Prometheus для логов»: без JVM, индексирует только метки, поэтому в разы
   легче OpenSearch. Ретенция — 7 дней (см. `docker/logging/loki-config.yml`).
+- Многострочные записи (stack trace) склеиваются в одну обратно на стороне Fluent Bit
+  (multiline-парсер `mixed_multiline`), поэтому не разваливаются на отдельные строки.
+
+### Доменные события (единая схема)
+
+Бизнес-события приложения пишутся через выделенный канал `events`
+([`App\Services\EventLogger`](app/Services/EventLogger.php)) в **единой JSON-схеме**
+([`App\Logging\JsonEventFormatter`](app/Logging/JsonEventFormatter.php)):
+
+```json
+{"timestamp":"…","level":"info","service":"link-shortener",
+ "event":"link.created","message":"…","user_id":5,"context":{"code":"abc123","url":"…"}}
+```
+
+Логируемые события:
+
+| event | когда |
+|---|---|
+| `auth.login` / `auth.logout` / `auth.failed` / `auth.registered` | вход / выход / неудачный вход / регистрация |
+| `link.created` / `link.deleted` | создание / удаление ссылки |
+| `link.clicked` | переход по короткой ссылке (code, ip, link_id) |
+
+Благодаря единой схеме события фильтруются одинаково по полю `event`.
 
 Примеры запросов **LogQL** (Grafana → Explore):
 
 ```logql
-{container_name="/link_shortener_app"}                     # все логи приложения
-{job="docker"} |= "error"                                  # ошибки по всем контейнерам
-{container_name="/link_shortener_app"} | json | level="error"   # разобрать JSON и фильтровать
+{container_name="/link_shortener_app"}                          # все логи приложения
+{job="docker"} |= "error"                                       # ошибки по всем контейнерам
+{container_name="/link_shortener_app"} | json | event="link.created"    # только создания ссылок
+{container_name="/link_shortener_app"} | json | event="auth.failed"     # неудачные входы
+sum by (event) (count_over_time({container_name="/link_shortener_app"} | json [5m]))  # разбивка по событиям
 ```
 
 Стек логирования локальный (dev). Компоненты (образы Fluent Bit/Loki/Grafana,

@@ -105,6 +105,18 @@ return [
             'processors' => [PsrLogMessageProcessor::class],
         ],
 
+        // Dedicated channel for domain/business events with a unified JSON schema.
+        'events' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'with' => [
+                'stream' => 'php://stderr',
+            ],
+            'formatter' => \App\Logging\JsonEventFormatter::class,
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
+
         'syslog' => [
             'driver' => 'syslog',
             'level' => env('LOG_LEVEL', 'debug'),

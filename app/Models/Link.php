@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\EventLogger;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,26 @@ class Link extends Model
 {
     /** @use HasFactory<\Database\Factories\LinkFactory> */
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        static::created(function (Link $link): void {
+            app(EventLogger::class)->record('link.created', 'Short link created', [
+                'user_id' => $link->user_id,
+                'link_id' => $link->id,
+                'code' => $link->code,
+                'url' => $link->original_url,
+            ]);
+        });
+
+        static::deleted(function (Link $link): void {
+            app(EventLogger::class)->record('link.deleted', 'Short link deleted', [
+                'user_id' => $link->user_id,
+                'link_id' => $link->id,
+                'code' => $link->code,
+            ]);
+        });
+    }
 
     protected $fillable = [
         'user_id',
