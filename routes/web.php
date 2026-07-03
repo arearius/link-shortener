@@ -3,8 +3,9 @@
 use App\Http\Controllers\RedirectController;
 use Illuminate\Support\Facades\Route;
 
+// Root goes straight to the Filament dashboard (guests are then sent to login).
 Route::get('/', function () {
-    return view('welcome');
+    return redirect('/app');
 });
 
 // Public short-link redirect. Registered last as a catch-all; the constraint

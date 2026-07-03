@@ -49,7 +49,7 @@ docker compose up -d --build
 > Первый запуск дольше: внутри контейнера выполняется `composer install`.
 > Прогресс виден в `docker compose logs -f app` (строки `[entrypoint] ...`).
 
-Приложение: <http://localhost:8080>
+Приложение: <http://localhost:8080> — корень сразу редиректит на личный кабинет.
 Личный кабинет (Filament): <http://localhost:8080/app>
 
 ### Демо-данные (необязательно)
