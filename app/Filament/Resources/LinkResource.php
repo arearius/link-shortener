@@ -50,18 +50,15 @@ class LinkResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('code')
-                    ->label('Код')
-                    ->searchable()
-                    ->sortable(),
-
                 Tables\Columns\TextColumn::make('short_url')
                     ->label('Короткая ссылка')
                     ->url(fn (Link $record): string => $record->short_url)
                     ->openUrlInNewTab()
                     ->copyable()
                     ->copyMessage('Скопировано')
-                    ->icon('heroicon-m-clipboard'),
+                    ->icon('heroicon-m-clipboard')
+                    // short_url is an accessor; search against the underlying `code` column.
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where('code', 'like', "%{$search}%")),
 
                 Tables\Columns\TextColumn::make('original_url')
                     ->label('Оригинальный URL')
