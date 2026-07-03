@@ -8,10 +8,10 @@ use Tests\TestCase;
 
 class ExternalUrlRuleTest extends TestCase
 {
-    private function passes(string $url): bool
+    private function passes(mixed $value): bool
     {
         return Validator::make(
-            ['url' => $url],
+            ['url' => $value],
             ['url' => new ExternalUrl()],
         )->passes();
     }
@@ -19,8 +19,10 @@ class ExternalUrlRuleTest extends TestCase
     public static function validUrls(): array
     {
         return [
-            ['https://example.com/page'],
-            ['http://sub.example.org/a/b?c=1'],
+            'https' => ['https://example.com/page'],
+            'http with query' => ['http://sub.example.org/a/b?c=1'],
+            'uppercase scheme' => ['HTTPS://example.com'],
+            'external host with port' => ['https://example.com:8443/x'],
         ];
     }
 
@@ -31,6 +33,7 @@ class ExternalUrlRuleTest extends TestCase
             'ftp scheme' => ['ftp://example.com/file'],
             'no host' => ['https://'],
             'plain text' => ['not a url'],
+            'protocol-relative (no scheme)' => ['//example.com/path'],
             'localhost' => ['http://localhost:8080/app'],
             'loopback ip' => ['http://127.0.0.1/app/login'],
         ];
@@ -48,10 +51,16 @@ class ExternalUrlRuleTest extends TestCase
         $this->assertFalse($this->passes($url));
     }
 
-    public function test_it_rejects_the_application_host(): void
+    public function test_it_rejects_the_application_host_case_insensitively(): void
     {
         config(['app.url' => 'https://links.example.test']);
 
         $this->assertFalse($this->passes('https://links.example.test/app/login'));
+        $this->assertFalse($this->passes('HTTPS://LINKS.EXAMPLE.TEST/app'));
+    }
+
+    public function test_it_rejects_a_non_string_value(): void
+    {
+        $this->assertFalse($this->passes(['not', 'a', 'string']));
     }
 }

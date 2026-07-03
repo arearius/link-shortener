@@ -18,6 +18,13 @@ class ShortCodeGeneratorTest extends TestCase
         $this->assertSame(8, strlen($generator->generate()));
     }
 
+    public function test_default_code_length_is_six(): void
+    {
+        $generator = new ShortCodeGenerator();
+
+        $this->assertSame(6, strlen($generator->generate()));
+    }
+
     public function test_generated_code_only_uses_the_base62_alphabet(): void
     {
         $generator = new ShortCodeGenerator();
@@ -36,5 +43,14 @@ class ShortCodeGeneratorTest extends TestCase
 
         $this->assertNotSame($existing->code, $code);
         $this->assertDatabaseMissing('links', ['code' => $code]);
+    }
+
+    public function test_generate_unique_returns_a_valid_code(): void
+    {
+        $generator = new ShortCodeGenerator();
+        $code = $generator->generateUnique();
+
+        $this->assertSame(6, strlen($code));
+        $this->assertMatchesRegularExpression('/^[0-9a-zA-Z]+$/', $code);
     }
 }
