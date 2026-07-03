@@ -37,28 +37,33 @@
 git clone https://github.com/arearius/link-shortener.git
 cd link-shortener
 
-# 1. Файл окружения
-cp .env.example .env
-
-# 2. Собрать образ и поднять сервисы (app: FrankenPHP, db: PostgreSQL)
+# Одна команда: собрать образ, поднять сервисы и полностью подготовить приложение
 docker compose up -d --build
-
-# 3. Установить зависимости и сгенерировать ключ приложения
-docker compose exec app composer install
-docker compose exec app php artisan key:generate
-
-# 4. Миграции
-docker compose exec app php artisan migrate
-
-# 5. (необязательно) демо-данные: пользователь + примеры ссылок с кликами
-docker compose exec app php artisan db:seed
 ```
+
+Всё остальное делает entrypoint контейнера при первом старте (идемпотентно):
+создаёт `.env` из `.env.example`, ставит зависимости (`composer install`),
+генерирует `APP_KEY` и применяет миграции — затем запускает FrankenPHP.
+Ручные шаги не нужны.
+
+> Первый запуск дольше: внутри контейнера выполняется `composer install`.
+> Прогресс виден в `docker compose logs -f app` (строки `[entrypoint] ...`).
 
 Приложение: <http://localhost:8080>
 Личный кабинет (Filament): <http://localhost:8080/app>
 
-**Демо-доступ** (после `db:seed`): `demo@example.com` / `password` — с тремя
-готовыми ссылками и статистикой. Сидер идемпотентен, повторный запуск не дублирует данные.
+### Демо-данные (необязательно)
+
+Чтобы получить готового пользователя с примерами ссылок и статистикой, включите
+сидинг переменной `APP_SEED=true` (одноразово при старте):
+
+```bash
+APP_SEED=true docker compose up -d --build
+# либо вручную в уже запущенном контейнере:
+docker compose exec app php artisan db:seed
+```
+
+**Демо-доступ:** `demo@example.com` / `password`. Сидер идемпотентен — повторный запуск не дублирует данные.
 
 > Локально сервер работает по **чистому HTTP** (`SERVER_NAME=:8080` в
 > `docker-compose.yml`), поэтому самоподписанных сертификатов и предупреждений
@@ -109,11 +114,111 @@ app/
 └── Services/ShortCodeGenerator.php              # генерация base62-кода
 database/migrations/                             # links, clicks
 database/seeders/DatabaseSeeder.php              # демо-пользователь + ссылки
-docker/                                          # Dockerfile (FrankenPHP), Caddyfile, init.sql
+docker/                                          # Dockerfile (FrankenPHP), Caddyfile,
+                                                 # entrypoint.sh (авто-bootstrap), init.sql
 docker-compose.yml
 tests/{Unit,Feature}/
 docs/PLAN.md
 ```
+
+## Развёртывание
+
+### Локальная разработка
+
+Достаточно одной команды (см. [Быстрый старт](#быстрый-старт)):
+
+```bash
+docker compose up -d --build
+```
+
+Исходный код монтируется в контейнер томом (`./:/app`), поэтому изменения в файлах
+сразу видны без пересборки образа. Entrypoint при первом старте сам подготавливает
+приложение (`.env`, зависимости, ключ, миграции).
+
+Частые команды:
+
+```bash
+docker compose logs -f app                      # логи приложения (в т.ч. [entrypoint])
+docker compose exec app php artisan migrate     # применить новые миграции
+docker compose exec app php artisan test        # тесты
+docker compose exec app php artisan tinker      # REPL
+docker compose exec app composer install        # доустановить зависимости
+```
+
+### Production
+
+В проде код **запекается в образ** (без bind-mount), зависимости ставятся без dev,
+включается кэширование конфигурации и реальный HTTPS.
+
+**1. Требования на сервере**
+- Docker + Docker Compose (или образ, собранный в CI и загруженный в реестр).
+- Открытые порты `80` и `443` (для авто-TLS от Let's Encrypt) и доступный домен,
+  указывающий A/AAAA-записью на сервер.
+
+**2. Production-образ.** В [docker/Dockerfile](docker/Dockerfile) уже есть закомментированный
+блок для standalone-сборки — раскомментируйте его, чтобы код и зависимости попали в образ:
+
+```dockerfile
+COPY . /app
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+```
+
+**3. Файл окружения `.env`** (создайте на сервере, не коммитьте):
+
+```dotenv
+APP_NAME="Link Shortener"
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=            # сгенерируйте: php artisan key:generate --show
+APP_URL=https://links.example.com
+
+DB_CONNECTION=pgsql
+DB_HOST=postgres
+DB_PORT=5432
+DB_DATABASE=link_shortener
+DB_USERNAME=laravel
+DB_PASSWORD=<надёжный-пароль>
+```
+
+**4. Реальный HTTPS.** Укажите домен вместо `:8080` — FrankenPHP/Caddy сам получит
+и будет обновлять сертификат Let's Encrypt. Пример `docker-compose.prod.yml` (override):
+
+```yaml
+services:
+  app:
+    environment:
+      SERVER_NAME: "links.example.com"   # реальный домен -> авто-HTTPS
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes: []                          # без bind-mount: код уже в образе
+  postgres:
+    ports: []                            # БД наружу не публикуем
+```
+
+Запуск с override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+**5. Оптимизация после деплоя** (entrypoint уже выполнит миграции; кэши прогрейте вручную
+или добавьте в entrypoint для прод-профиля):
+
+```bash
+docker compose exec app php artisan config:cache
+docker compose exec app php artisan route:cache
+docker compose exec app php artisan filament:optimize
+```
+
+**6. Проверка.** Health-check Laravel доступен на `GET /up`; главная и панель — на
+`https://<домен>/` и `https://<домен>/app`.
+
+> **Опционально — максимум производительности.** FrankenPHP умеет worker-режим через
+> Laravel Octane (`composer require laravel/octane` + запуск
+> `frankenphp run` в worker mode). Это держит приложение в памяти между запросами
+> (в бенчмарках ~кратный прирост RPS), но требует аккуратности со стейтом. Для базового
+> прод-развёртывания не обязателен.
 
 ## Остановка
 

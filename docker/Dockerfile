@@ -18,12 +18,16 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Explicit Caddy/FrankenPHP config (roots to public/, HTTP only when SERVER_NAME=:8080)
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 
+# First-run bootstrap entrypoint (kept outside /app so the bind mount can't shadow it)
+COPY docker/entrypoint.sh /usr/local/bin/app-entrypoint.sh
+RUN chmod +x /usr/local/bin/app-entrypoint.sh
+
 WORKDIR /app
 
-# In dev the source is bind-mounted over /app and `composer install` is run there.
-# For a standalone (non-mounted) build, uncomment:
-# COPY . /app
-# RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+# In dev the source is bind-mounted over /app; the entrypoint runs composer install,
+# key generation and migrations on first start, then launches FrankenPHP.
 
 # FrankenPHP listens on the port encoded in SERVER_NAME (e.g. :8080)
 EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/app-entrypoint.sh"]
