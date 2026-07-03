@@ -202,8 +202,22 @@ services:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-**5. Оптимизация после деплоя** (entrypoint уже выполнит миграции; кэши прогрейте вручную
-или добавьте в entrypoint для прод-профиля):
+**5. Миграции при деплое.** Entrypoint при каждом старте выполняет `php artisan app:migrate` —
+это `migrate --force` под **advisory-lock PostgreSQL**, поэтому при нескольких репликах
+приложения одновременно мигрирует только одна, остальные ждут (в отличие от
+`migrate --isolated`, лок не требует таблиц и работает на пустой БД). Применяются
+только новые миграции, данные не трогаются.
+
+Если хотите прогонять миграции **отдельным управляемым шагом** CI/CD (zero-downtime),
+отключите авто-миграцию флагом `APP_MIGRATE=false` и запускайте вручную:
+
+```bash
+APP_MIGRATE=false docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose exec app php artisan app:migrate
+```
+
+**6. Оптимизация после деплоя** (кэши прогрейте вручную или добавьте в entrypoint
+для прод-профиля):
 
 ```bash
 docker compose exec app php artisan config:cache
@@ -211,7 +225,7 @@ docker compose exec app php artisan route:cache
 docker compose exec app php artisan filament:optimize
 ```
 
-**6. Проверка.** Health-check Laravel доступен на `GET /up`; главная и панель — на
+**7. Проверка.** Health-check Laravel доступен на `GET /up`; главная и панель — на
 `https://<домен>/` и `https://<домен>/app`.
 
 > **Опционально — максимум производительности.** FrankenPHP умеет worker-режим через

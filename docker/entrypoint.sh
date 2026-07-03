@@ -26,9 +26,16 @@ if ! grep -q '^APP_KEY=base64:' .env; then
     php artisan key:generate --force
 fi
 
-# 4. Database migrations (postgres is already healthy via compose depends_on)
-echo "[entrypoint] running migrations"
-php artisan migrate --force
+# 4. Database migrations (postgres is already healthy via compose depends_on).
+#    Guarded by a Postgres advisory lock (app:migrate) so multiple app replicas
+#    starting together don't race. Set APP_MIGRATE=false to run migrations as a
+#    separate, controlled deploy step instead.
+if [ "${APP_MIGRATE:-true}" = "true" ]; then
+    echo "[entrypoint] running migrations"
+    php artisan app:migrate
+else
+    echo "[entrypoint] APP_MIGRATE=false -> skipping migrations"
+fi
 
 # 5. Optional demo data: set APP_SEED=true in the environment to enable
 if [ "${APP_SEED:-false}" = "true" ]; then

@@ -8,6 +8,8 @@ services:
     environment:
       # ":8080" -> HTTP only, Caddy auto-TLS disabled (no local certificates)
       SERVER_NAME: ":8080"
+      # Run migrations on start (advisory-locked). Set false to migrate separately.
+      APP_MIGRATE: ${APP_MIGRATE:-true}
       # Set APP_SEED=true to auto-run the demo seeder on first start
       APP_SEED: ${APP_SEED:-false}
     ports:
