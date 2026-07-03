@@ -1,0 +1,17 @@
+{
+	# FrankenPHP app server (built on Caddy)
+	frankenphp
+}
+
+# Site address comes from SERVER_NAME.
+# Locally we pass SERVER_NAME=":8080" -> plain HTTP, auto-TLS disabled (no certs, no warnings).
+# For real deployment pass a domain (e.g. links.example.com) and Caddy fetches a Let's Encrypt cert.
+{$SERVER_NAME:localhost} {
+	root * /app/public
+	encode zstd br gzip
+
+	# Serve the Laravel front controller
+	php_server {
+		try_files {path} index.php
+	}
+}
