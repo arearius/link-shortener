@@ -1,0 +1,68 @@
+# Lightweight centralized logging: Fluent Bit -> Loki -> Grafana.
+# Enable alongside the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d --build
+#
+# App/DB container logs are shipped via Docker's fluentd logging driver to
+# Fluent Bit (forward input), which forwards them to Loki. View in Grafana.
+services:
+  # Route app & db container output to Fluent Bit instead of the json-file driver.
+  app:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        fluentd-async: "true"   # don't block/fail if Fluent Bit isn't up yet
+        tag: "docker.app"
+
+  postgres:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "localhost:24224"
+        fluentd-async: "true"
+        tag: "docker.postgres"
+
+  fluent-bit:
+    image: fluent/fluent-bit:3.1.9
+    container_name: link_shortener_fluentbit
+    restart: unless-stopped
+    ports:
+      - "24224:24224"          # forward input (Docker logging driver -> here)
+    volumes:
+      - ./docker/logging/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./docker/logging/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+    depends_on:
+      - loki
+
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: link_shortener_loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/logging/loki-config.yml:/etc/loki/local-config.yml:ro
+      - loki_data:/loki
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: link_shortener_grafana
+    restart: unless-stopped
+    environment:
+      # Dev-only: open Grafana without login.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./docker/logging/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+
+volumes:
+  loki_data:
+  grafana_data:

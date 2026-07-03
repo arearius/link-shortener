@@ -10,6 +10,12 @@
 	root * /app/public
 	encode zstd br gzip
 
+	# JSON access logs to stderr -> collected by Fluent Bit -> Loki
+	log {
+		output stderr
+		format json
+	}
+
 	# Serve the Laravel front controller
 	php_server {
 		try_files {path} index.php

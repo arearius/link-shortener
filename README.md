@@ -116,7 +116,9 @@ database/migrations/                             # links, clicks
 database/seeders/DatabaseSeeder.php              # демо-пользователь + ссылки
 docker/                                          # Dockerfile (FrankenPHP), Caddyfile,
                                                  # entrypoint.sh (авто-bootstrap), init.sql
+docker/logging/                                  # Fluent Bit, Loki, Grafana конфиги
 docker-compose.yml
+docker-compose.logging.yml                       # оверрей: Fluent Bit -> Loki -> Grafana
 tests/{Unit,Feature}/
 docs/PLAN.md
 ```
@@ -234,9 +236,42 @@ docker compose exec app php artisan filament:optimize
 > (в бенчмарках ~кратный прирост RPS), но требует аккуратности со стейтом. Для базового
 > прод-развёртывания не обязателен.
 
+## Логирование
+
+Приложение и Caddy пишут **структурированные JSON-логи в stderr** (12-factor):
+`LOG_CHANNEL=stderr` + `Monolog\Formatter\JsonFormatter` для Laravel, `log { format json }`
+для FrankenPHP/Caddy. Без дополнительного стека их видно через `docker compose logs -f`.
+
+Для централизованного сбора есть лёгкий стек **Fluent Bit → Loki → Grafana**
+(в отдельном оверрее `docker-compose.logging.yml`, чтобы базовый запуск оставался лёгким):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d --build
+```
+
+- **Grafana**: <http://localhost:3000> — вход отключён (dev), datasource **Loki** уже
+  провижен. Explore → выбрать Loki.
+- Логи контейнеров `app`/`postgres` отправляются через Docker-драйвер **fluentd** в
+  Fluent Bit (`:24224`), тот форвардит в **Loki** (`:3100`), Grafana читает из Loki.
+- Loki — «Prometheus для логов»: без JVM, индексирует только метки, поэтому в разы
+  легче OpenSearch. Ретенция — 7 дней (см. `docker/logging/loki-config.yml`).
+
+Примеры запросов **LogQL** (Grafana → Explore):
+
+```logql
+{container_name="/link_shortener_app"}                     # все логи приложения
+{job="docker"} |= "error"                                  # ошибки по всем контейнерам
+{container_name="/link_shortener_app"} | json | level="error"   # разобрать JSON и фильтровать
+```
+
+Стек логирования локальный (dev). Компоненты (образы Fluent Bit/Loki/Grafana,
+конфиги в `docker/logging/`) переносятся в прод-профиль тем же оверрееем; для прод
+Grafana включите аутентификацию (уберите `GF_AUTH_ANONYMOUS_*`).
+
 ## Остановка
 
 ```bash
-docker compose down          # остановить сервисы
-docker compose down -v       # + удалить том с данными PostgreSQL
+docker compose down                                         # базовые сервисы
+docker compose -f docker-compose.yml -f docker-compose.logging.yml down   # вместе с логированием
+docker compose ... down -v                                  # + удалить тома (БД, Loki, Grafana)
 ```
