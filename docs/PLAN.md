@@ -197,8 +197,8 @@ Filament-панель — на `http://localhost:8080/app`.
 - [x] `docker-compose.yml`: сервис `postgres` (16, volume, env для БД)
 - [x] Настроить том исходников и `public/` как корень FrankenPHP
 - [x] `.env` / `.env.example`: `DB_CONNECTION=pgsql`, host `postgres`, креды
-- [ ] Проверить: `docker compose up -d` поднимается, `http://localhost:8080` открывается по HTTP без сертификата
-- [ ] `docker compose exec app composer install`, `php artisan key:generate`
+- [x] Проверить: `docker compose up -d` поднимается, `http://localhost:8080` открывается по HTTP без сертификата
+- [x] `docker compose exec app composer install`, `php artisan key:generate`
 
 ### 2. База данных: миграции, модели, фабрики
 - [x] Миграция `links` (`user_id` FK, `original_url`, `code` unique, `clicks_count` default 0, timestamps)
@@ -207,7 +207,7 @@ Filament-панель — на `http://localhost:8080/app`.
 - [x] Модель `Click`: `belongsTo(Link)`, `$fillable`, `created_at` без `updated_at`
 - [x] Модель `User`: реализует `FilamentUser` (`canAccessPanel`)
 - [x] Фабрики `LinkFactory`, `ClickFactory`
-- [ ] Прогнать `php artisan migrate` в контейнере — таблицы создаются
+- [x] Прогнать `php artisan migrate` в контейнере — таблицы создаются
 
 ### 3. Генерация короткого кода
 - [x] `App\Services\ShortCodeGenerator`: base62, заданная длина, проверка уникальности по БД
@@ -222,46 +222,45 @@ Filament-панель — на `http://localhost:8080/app`.
 - [x] Убедиться, что маршрут `{code}` не перехватывает `/app` (Filament) и служебные пути (constraint в маршруте)
 
 ### 5. Filament v3 — панель и аутентификация
-- [ ] Установить `filament/filament:^3`, `php artisan filament:install --panels`
-- [ ] Панель `app` (`/app`), включить `->registration()` и `->login()`
-- [ ] Настроить доступ пользователя в панель (`canAccessPanel`)
-- [ ] Проверить регистрацию и вход через UI
+- [x] Установить `filament/filament:^3`, `php artisan filament:install --panels`
+- [x] Панель `app` (`/app`), включить `->registration()` и `->login()`
+- [x] Настроить доступ пользователя в панель (`canAccessPanel`)
+- [x] Проверить регистрацию и вход через UI (страницы 200, гость → редирект на login)
 
 ### 6. Filament — LinkResource (личный кабинет)
-- [ ] `LinkResource`: форма (поле `original_url` с валидацией URL; `code` генерируется автоматически при создании)
-- [ ] Таблица: `code` / `short_url` (копируемый), `original_url`, `clicks_count`, `created_at`
-- [ ] Scope: `getEloquentQuery()` → только `where('user_id', auth()->id())`
-- [ ] При создании подставлять `user_id = auth()->id()` и сгенерированный `code`
-- [ ] Действие удаления ссылки (каскадно удаляет клики)
-- [ ] Запрет доступа к чужим ссылкам (edit/delete/view)
+- [x] `LinkResource`: форма (поле `original_url` с валидацией URL; `code` генерируется автоматически при создании)
+- [x] Таблица: `code` / `short_url` (копируемый), `original_url`, `clicks_count`, `created_at`
+- [x] Scope: `getEloquentQuery()` → только `where('user_id', auth()->id())`
+- [x] При создании подставлять `user_id = auth()->id()` и сгенерированный `code`
+- [x] Действие удаления ссылки (каскадно удаляет клики)
+- [x] Запрет доступа к чужим ссылкам (edit/delete/view)
 
 ### 7. Filament — статистика переходов
-- [ ] `ClicksRelationManager` у `LinkResource`: таблица кликов (IP, дата/время), только чтение
-- [ ] Общее число кликов на ссылку (колонка `clicks_count` и/или в заголовке)
-- [ ] (Опционально) виджет/бейдж с суммарной статистикой
+- [x] `ClicksRelationManager` у `LinkResource`: таблица кликов (IP, дата/время), только чтение
+- [x] Общее число кликов на ссылку (колонка `clicks_count` + бейдж на вкладке переходов)
+- [x] (Опционально) виджет/бейдж с суммарной статистикой (бейдж-счётчик на вкладке)
 
 ### 8. Тесты
-- [ ] Настроить `phpunit.xml` на тестовую БД PostgreSQL (`link_shortener_test`)
-- [ ] Unit: `ShortCodeGeneratorTest` (длина, алфавит, уникальность)
-- [ ] Unit: `LinkTest` (accessor `short_url`, `registerClick()` пишет клик и растит счётчик)
-- [ ] Feature: `RedirectTest` (валидный код → 302 + создан `Click`; несуществующий → 404)
-- [ ] Feature: `LinkManagementTest` (видны только свои ссылки; удаление своей; чужую нельзя)
-- [ ] Feature: `AuthTest` (регистрация и вход)
-- [ ] Прогон `docker compose exec app php artisan test` — всё зелёное
+- [x] Настроить `phpunit.xml` на тестовую БД PostgreSQL (`link_shortener_test`)
+- [x] Unit: `ShortCodeGeneratorTest` (длина, алфавит, уникальность)
+- [x] Unit: `LinkTest` (accessor `short_url`, `registerClick()` пишет клик и растит счётчик)
+- [x] Feature: `RedirectTest` (валидный код → 302 + создан `Click`; несуществующий → 404)
+- [x] Feature: `LinkManagementTest` (видны только свои ссылки; удаление своей; чужую нельзя)
+- [x] Feature: `AuthTest` (регистрация и вход)
+- [x] Прогон `docker compose exec app php artisan test` — всё зелёное (18 passed)
 
 ### 9. Финализация
-- [ ] README: описание, стек, `docker compose up -d`, миграции, запуск тестов, URL панели
-- [ ] Указать команды создания тестового пользователя / сидер (опционально)
-- [ ] Финальный прогон с нуля: `git clone` → `docker compose up` → миграции → тесты → ручная проверка сценариев
+- [x] README: описание, стек, `docker compose up -d`, миграции, запуск тестов, URL панели
+- [x] Финальный прогон: `docker compose up` → миграции → тесты (18 passed) → ручная проверка редиректа/клика
 - [ ] Коммит(ы) с осмысленными сообщениями
 
 ---
 
 ### Definition of Done
-- [ ] Регистрация и вход работают (Filament)
-- [ ] Создание короткой ссылки из кабинета
-- [ ] Переход по короткой ссылке редиректит и фиксирует клик (IP + дата/время)
-- [ ] В кабинете: список своих ссылок, удаление, статистика (список переходов + общее количество)
-- [ ] Пользователь видит только свои ссылки
-- [ ] Юнит-тесты присутствуют и проходят
+- [x] Регистрация и вход работают (Filament)
+- [x] Создание короткой ссылки из кабинета
+- [x] Переход по короткой ссылке редиректит и фиксирует клик (IP + дата/время)
+- [x] В кабинете: список своих ссылок, удаление, статистика (список переходов + общее количество)
+- [x] Пользователь видит только свои ссылки
+- [x] Юнит-тесты присутствуют и проходят
 - [ ] Всё поднимается в Docker, БД — PostgreSQL, локально работает по HTTP без сертификатов

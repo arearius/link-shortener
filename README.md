@@ -1,66 +1,111 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Link Shortener
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Веб-приложение для создания коротких ссылок с личным кабинетом, статистикой
+переходов и аутентификацией. Построено на **Laravel 11** и **Filament v3**,
+работает в Docker на **FrankenPHP** (Caddy) + **PostgreSQL**.
 
-## About Laravel
+## Возможности
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Регистрация и вход (Filament).
+- Создание короткой ссылки из оригинального URL (`https://example.com/page` → `http://localhost:8080/abc123`).
+- Публичный редирект по короткой ссылке с фиксацией перехода.
+- Личный кабинет: список **своих** ссылок, удаление, статистика.
+- Статистика по каждой ссылке: IP-адрес, дата/время перехода, общее число кликов.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Технологический стек
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Слой | Технология |
+|------|-----------|
+| Язык | PHP 8.4 |
+| Фреймворк | Laravel 11 |
+| Личный кабинет / админка | Filament v3 |
+| БД | PostgreSQL 16 |
+| Сервер приложений | FrankenPHP (Caddy-based), без отдельного nginx + php-fpm |
+| Тесты | PHPUnit (Unit + Feature) |
+| Контейнеризация | Docker + docker compose |
 
-## Learning Laravel
+Подробный план и архитектура — в [docs/PLAN.md](docs/PLAN.md).
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Требования
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- Docker и Docker Compose (Docker Desktop на Windows/macOS подходит).
+- Локально PHP/Composer **не нужны** — всё выполняется в контейнерах.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Быстрый старт
 
-## Laravel Sponsors
+```bash
+git clone https://github.com/arearius/link-shortener.git
+cd link-shortener
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+# 1. Файл окружения
+cp .env.example .env
 
-### Premium Partners
+# 2. Собрать образ и поднять сервисы (app: FrankenPHP, db: PostgreSQL)
+docker compose up -d --build
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+# 3. Установить зависимости и сгенерировать ключ приложения
+docker compose exec app composer install
+docker compose exec app php artisan key:generate
 
-## Contributing
+# 4. Миграции
+docker compose exec app php artisan migrate
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Приложение: <http://localhost:8080>
+Личный кабинет (Filament): <http://localhost:8080/app>
 
-## Code of Conduct
+> Локально сервер работает по **чистому HTTP** (`SERVER_NAME=:8080` в
+> `docker-compose.yml`), поэтому самоподписанных сертификатов и предупреждений
+> браузера нет. Для боевого деплоя достаточно указать в `SERVER_NAME` реальный
+> домен — FrankenPHP/Caddy сам получит TLS-сертификат Let's Encrypt.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Использование
 
-## Security Vulnerabilities
+1. Откройте <http://localhost:8080/app/register> и зарегистрируйтесь.
+2. В разделе **«Мои ссылки»** нажмите «Создать ссылку», укажите оригинальный URL —
+   короткий код сгенерируется автоматически.
+3. Перейдите по короткой ссылке (`http://localhost:8080/{код}`) — произойдёт
+   редирект, а переход попадёт в статистику.
+4. Откройте ссылку («Просмотр»/«Изменить») — под формой виден список переходов
+   (IP, дата/время) и общее число кликов.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Тесты
 
-## License
+Юнит- и feature-тесты выполняются против отдельной БД `link_shortener_test`
+(создаётся автоматически при первом старте PostgreSQL, см. `docker/postgres/init.sql`):
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+docker compose exec app php artisan test
+```
+
+Покрытие:
+
+- **Unit** — `ShortCodeGenerator` (длина, алфавит base62, уникальность),
+  модель `Link` (accessor `short_url`, запись клика + инкремент счётчика).
+- **Feature** — редирект (302 + запись клика, 404 на неизвестный код),
+  управление ссылками в Filament (видны только свои, создание, удаление,
+  запрет доступа к чужим), страницы регистрации/входа.
+
+## Структура
+
+```
+app/
+├── Filament/Resources/LinkResource.php         # личный кабинет: CRUD ссылок
+│   └── LinkResource/RelationManagers/          # статистика переходов
+├── Http/Controllers/RedirectController.php      # публичный редирект + учёт кликов
+├── Models/{Link,Click,User}.php
+├── Providers/Filament/AppPanelProvider.php      # панель /app с регистрацией
+└── Services/ShortCodeGenerator.php              # генерация base62-кода
+database/migrations/                             # links, clicks
+docker/                                          # Dockerfile (FrankenPHP), Caddyfile, init.sql
+docker-compose.yml
+tests/{Unit,Feature}/
+docs/PLAN.md
+```
+
+## Остановка
+
+```bash
+docker compose down          # остановить сервисы
+docker compose down -v       # + удалить том с данными PostgreSQL
+```
